@@ -6,16 +6,16 @@ A pure capability-enhancement system prompt for DeepSeek V4 models (V4-Pro / V4-
 
 `DEEPSEEK-ENHANCE.md` is a system-level prompt that unlocks the full potential of DeepSeek V4 models by providing structured guidance on:
 
-- **Thinking Mode** â€” Chain-of-thought reasoning with controllable effort levels (high/max), reasoning_content lifecycle management, and multi-turn tool-call reasoning loops
-- **Model Selection** â€” Decision guide for choosing between deepseek-v4-pro (flagship reasoning) and deepseek-v4-flash (fast/cost-efficient)
-- **Code Enhancement** â€” FIM completion, JSON structured output, tool calls, chat prefix completion, and coding best practices
-- **Context Caching** â€” Automatic disk cache mechanics, cache-hit patterns, and prefix reuse strategies to minimize costs
-- **Search & Tools** â€” When to search, how to scale tool calls, citation formatting, and image search guidelines
-- **Chinese Native Optimization** â€” Bilingual proficiency, typesetting conventions, code/technical writing language choice, and domain terminology
+- **Thinking Mode** â€?Chain-of-thought reasoning with controllable effort levels (high/max), reasoning_content lifecycle management, and multi-turn tool-call reasoning loops
+- **Model Selection** â€?Decision guide for choosing between deepseek-v4-pro (flagship reasoning) and deepseek-v4-flash (fast/cost-efficient)
+- **Code Enhancement** â€?FIM completion, JSON structured output, tool calls, chat prefix completion, and coding best practices
+- **Context Caching** â€?Automatic disk cache mechanics, cache-hit patterns, and prefix reuse strategies to minimize costs
+- **Search & Tools** â€?When to search, how to scale tool calls, citation formatting, and image search guidelines
+- **Chinese Native Optimization** â€?Bilingual proficiency, typesetting conventions, code/technical writing language choice, and domain terminology
 
 ## Background
 
-This document draws structural inspiration from Anthropic's Claude Fable 5 system prompt â€” the internal prompt that powers Claude's advanced reasoning, tool use, and behavioral consistency. The content has been completely rewritten for DeepSeek's model architecture, API conventions, and capabilities, with all capability-limiting instructions removed.
+This document draws structural inspiration from Anthropic's Claude Fable 5 system prompt â€?the internal prompt that powers Claude's advanced reasoning, tool use, and behavioral consistency. The content has been completely rewritten for DeepSeek's model architecture, API conventions, and capabilities, with all capability-limiting instructions removed.
 
 ## Usage
 
@@ -64,3 +64,30 @@ claude --dangerously-skip-permissions --system-prompt-file DEEPSEEK-ENHANCE.md
 ## License
 
 MIT
+
+
+---
+
+# DeepSeek API Final Prompt Usage
+
+This is the clean publishable version intended for direct use in the `system` message of the DeepSeek API.
+
+Why this version is better:
+
+- short enough for repeated API use
+- broad enough to cover chat and coding
+- avoids product-specific claims and brittle runtime assumptions
+- reduces overthinking on simple tasks
+- keeps strong anti-hallucination guidance
+
+Recommended use:
+
+- use this as the base `system` prompt
+- add only a small number of app-specific rules on top
+- do not stack it with the old long enhance file
+
+Best fit:
+
+- mixed chat + coding assistants
+- Chinese-first technical assistants
+- low-noise API integrations where cost and stability matter
