@@ -1,93 +1,102 @@
 # DeepSeek Enhance MD
 
-A pure capability-enhancement system prompt for DeepSeek V4 models (V4-Pro / V4-Flash), adapted and inspired by the Claude Fable 5 system prompt architecture.
+System prompts and a small loader for the DeepSeek API. The prompts steer chat and coding answers. The loader checks the files and builds a chat request without calling the API or printing a key.
 
-## What This Is
+This repository does not ship a model and does not change the DeepSeek service. It documents how to call the current API as of 2026-11-13. Prices and limits change; confirm them at <https://api-docs.deepseek.com> before quoting a bill.
 
-`DEEPSEEK-ENHANCE.md` is a system-level prompt that unlocks the full potential of DeepSeek V4 models by providing structured guidance on:
+## Which prompt to send
 
-- **Thinking Mode** â€?Chain-of-thought reasoning with controllable effort levels (high/max), reasoning_content lifecycle management, and multi-turn tool-call reasoning loops
-- **Model Selection** â€?Decision guide for choosing between deepseek-v4-pro (flagship reasoning) and deepseek-v4-flash (fast/cost-efficient)
-- **Code Enhancement** â€?FIM completion, JSON structured output, tool calls, chat prefix completion, and coding best practices
-- **Context Caching** â€?Automatic disk cache mechanics, cache-hit patterns, and prefix reuse strategies to minimize costs
-- **Search & Tools** â€?When to search, how to scale tool calls, citation formatting, and image search guidelines
-- **Chinese Native Optimization** â€?Bilingual proficiency, typesetting conventions, code/technical writing language choice, and domain terminology
+Send one system prompt, not both.
 
-## Background
+| File | Role |
+|---|---|
+| `DEEPSEEK-API-SYSTEM-PROMPT-FINAL.md` | Default. Short rules for chat and coding. See [usage notes](DEEPSEEK-API-SYSTEM-PROMPT-FINAL-USAGE.md). |
+| `DEEPSEEK-ENHANCE.md` | Same kind of assistant, plus a checked snapshot of thinking mode, tools, caching, search, and errors. Use it when the assistant must answer questions about the DeepSeek API. |
 
-This document draws structural inspiration from Anthropic's Claude Fable 5 system prompt â€?the internal prompt that powers Claude's advanced reasoning, tool use, and behavioral consistency. The content has been completely rewritten for DeepSeek's model architecture, API conventions, and capabilities, with all capability-limiting instructions removed.
+`deepseek_prompt.build_messages(..., prompt="final")` loads the short file. `prompt="enhance"` loads the long file. `extra_system` appends a few application rules to the selected file.
 
-## Usage
+## Quick start
 
-Load `DEEPSEEK-ENHANCE.md` as the system prompt (or prepend it to your system prompt) when using DeepSeek V4 models via the API:
+Export the key in your shell. Do not commit it or pass it as a command-line argument.
 
-### OpenAI Format
+```bash
+export DEEPSEEK_API_KEY="your key from the DeepSeek platform"
+```
+
 ```python
 from openai import OpenAI
 
-with open("DEEPSEEK-ENHANCE.md", "r", encoding="utf-8") as f:
-    system_prompt = f.read()
+from deepseek_prompt import build_chat_kwargs, client_settings_from_env
 
-client = OpenAI(
-    api_key="<your-api-key>",
-    base_url="https://api.deepseek.com"
-)
-
+client = OpenAI(**client_settings_from_env())
 response = client.chat.completions.create(
-    model="deepseek-v4-pro",
-    messages=[
-        {"role": "system", "content": system_prompt},
-        {"role": "user", "content": "Your task here"}
-    ],
-    reasoning_effort="high",
-    extra_body={"thinking": {"type": "enabled"}}
+    **build_chat_kwargs(
+        "Your task here",
+        prompt="final",
+        model="deepseek-flash",
+        thinking=True,
+        reasoning_effort="high",
+    )
 )
+print(response.choices[0].message.content)
 ```
 
-### Anthropic Format
-```python
-base_url = "https://api.deepseek.com/anthropic"
-```
+The OpenAI SDK base URL is `https://api.deepseek.com`. Do not add `/v1` yourself. Beta features (FIM, chat prefix completion, and strict tools) use `client_settings_from_env(beta=True)`, which selects `https://api.deepseek.com/beta` unless `DEEPSEEK_BASE_URL` is set. The Anthropic-compatible base URL is `https://api.deepseek.com/anthropic`.
 
-### With Claude Code
+Check both prompt files without printing them:
+
 ```bash
-claude --dangerously-skip-permissions --system-prompt-file DEEPSEEK-ENHANCE.md
+python deepseek_prompt.py --check
 ```
 
-## Models Supported
+`deepseek_prompt.py` depends only on the Python standard library. CI runs it on Python 3.12. Install `openai` yourself when you want to make a request:
 
-| Model | Best For | Context | Max Output |
-|---|---|---|---|
-| `deepseek-v4-pro` | Complex reasoning, agent workflows, code | 1M | 384K |
-| `deepseek-v4-flash` | High-concurrency, simple Q&A, low latency | 1M | 384K |
+```bash
+python -m pip install openai
+```
+
+If `DEEPSEEK_API_KEY` is missing, `client_settings_from_env()` raises `PromptError` and the message does not include a key.
+
+## Models
+
+| Model id | Use | Context | Max output | Vision | Concurrency |
+|---|---|---|---|---|---|
+| `deepseek-flash` | Fast, lower cost, images. Served by DeepSeek-V4.1-Flash-1017. | 1M | 384K | Yes | 2500 |
+| `deepseek-v4-pro` | Hard text reasoning and agent work. Version DeepSeek-V4-Pro-0813. | 1M | 384K | No | 500 |
+
+`deepseek-v4-flash` and `deepseek-v4-flash-vision-exp` still route to Flash and are billed as Flash. Prefer `deepseek-flash` in new code.
+
+`deepseek-chat` and `deepseek-reasoner` were scheduled to be discontinued on 2026-07-24. Do not use them in new calls. Choose a current model id and set `thinking` yourself. Thinking is on by default, and the default effort is `high`.
+
+`recommend_model(complex_reasoning=..., needs_vision=...)` encodes the vision constraint: Pro cannot accept an image, so a request that needs both Pro and an image raises `PromptError`.
+
+## API behavior the long prompt used to get wrong
+
+These are the rules the loader and `DEEPSEEK-ENHANCE.md` now follow:
+
+- Requested effort `low` stays low. `medium` maps to `high`. `xhigh` maps to `high`, not `max`. `max` and `ultra` map to `max`.
+- Send `reasoning_content` back on every assistant turn when the request includes `tools`, even if that turn did not call a tool. Otherwise the API returns HTTP 400. Without `tools`, the API ignores `reasoning_content`.
+- `presence_penalty` and `frequency_penalty` no longer affect chat completions. `temperature` has no effect in thinking mode. `top_p` is model-specific.
+- Search and Fetch are separate HTTP APIs. The model must not claim it searched, and it must not emit another provider's citation tags.
+- JSON mode needs `response_format={"type": "json_object"}`, the word `json` in the prompt, and an example shape. Unparseable output can come back as spaces.
+- Strict tools need the beta base URL, `strict: true`, every property listed in `required`, and `additionalProperties: false`.
+
+Peak prices apply at 01:00-04:00 and 06:00-10:00 UTC on weekdays, excluding Chinese public holidays. All other hours are off-peak, at half the peak price. The dated table is in `DEEPSEEK-ENHANCE.md`.
+
+## Claude Code
+
+Point Claude Code at DeepSeek with environment variables from the official guide: <https://api-docs.deepseek.com/quick_start/agent_integrations/claude_code>. Set `ANTHROPIC_BASE_URL` to `https://api.deepseek.com/anthropic` and `ANTHROPIC_AUTH_TOKEN` to the same key. Names starting with `claude-opus` are billed as `deepseek-v4-pro`; other `claude*` names are billed as `deepseek-flash`. Set `CLAUDE_CODE_EFFORT_LEVEL` yourself. This repository does not enable permission bypasses.
+
+## Tests
+
+From the repository root:
+
+```bash
+python -m unittest discover -s tests -v
+```
+
+The tests are offline. They do not call DeepSeek and they do not need an API key.
 
 ## License
 
-MIT
-
-
----
-
-# DeepSeek API Final Prompt Usage
-
-This is the clean publishable version intended for direct use in the `system` message of the DeepSeek API.
-
-Why this version is better:
-
-- short enough for repeated API use
-- broad enough to cover chat and coding
-- avoids product-specific claims and brittle runtime assumptions
-- reduces overthinking on simple tasks
-- keeps strong anti-hallucination guidance
-
-Recommended use:
-
-- use this as the base `system` prompt
-- add only a small number of app-specific rules on top
-- do not stack it with the old long enhance file
-
-Best fit:
-
-- mixed chat + coding assistants
-- Chinese-first technical assistants
-- low-noise API integrations where cost and stability matter
+MIT. See [LICENSE](LICENSE).

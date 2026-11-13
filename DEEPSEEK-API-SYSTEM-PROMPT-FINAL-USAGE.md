@@ -14,7 +14,22 @@ Recommended use:
 
 - use this as the base `system` prompt
 - add only a small number of app-specific rules on top
-- do not stack it with the old long enhance file
+- do not concatenate it with `DEEPSEEK-ENHANCE.md`
+
+Load it from the repository root with:
+
+```python
+from openai import OpenAI
+
+from deepseek_prompt import build_chat_kwargs, client_settings_from_env
+
+client = OpenAI(**client_settings_from_env())
+response = client.chat.completions.create(
+    **build_chat_kwargs("Your task here", prompt="final")
+)
+```
+
+`deepseek_prompt.py` uses only the Python standard library. Install `openai` separately when you call the API. The key comes from `DEEPSEEK_API_KEY` and is not written into the request helper's logs.
 
 Best fit:
 
